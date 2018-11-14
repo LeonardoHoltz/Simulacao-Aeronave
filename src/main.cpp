@@ -187,18 +187,27 @@ GLint model_uniform;
 GLint view_uniform;
 GLint projection_uniform;
 GLint object_id_uniform;
-int anda_cima=0;
-int anda_baixo=0;
-int anda_direita=0;
-int anda_esquerda=0;
+
 float rotationX = 0.00f;
 int rotateR =0;
 int rotateL =0;
-float acelera=0.01f;
 glm::vec4 camera_position_c=glm::vec4(0.0f,0.0f,0.0f,1.0f);;
 bool afterRotation=false;
 glm::vec4 u;
 glm::vec4 w;
+
+// Variáveis de movimentação da nave.
+int anda_cima = 0;
+int anda_direita = 0;
+int anda_esquerda = 0;
+float acelera_frente = 0.00000f;
+int acelerando = 0;                     // indica se a nave está acelerando no momento
+int freando = 0;
+
+// Constantes de movimentação da nave.
+#define ROTATELIMIT 350                 // limite de rotação da nave quando ela anda para a direita ou esquerda.
+#define RV 1;
+#define RVB 2;
 
 int main(int argc, char* argv[])
 {
@@ -229,7 +238,7 @@ int main(int argc, char* argv[])
     // Criamos uma janela do sistema operacional, com 800 colunas e 600 linhas
     // de pixels, e com título "INF01047 ...".
     GLFWwindow* window;
-    window = glfwCreateWindow(800, 600, "INF01047 - 00287702 - Leonardo Holtz de Oliveira", NULL, NULL);
+    window = glfwCreateWindow(800, 600, "Battle Ship", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -308,7 +317,9 @@ int main(int argc, char* argv[])
     glm::mat4 the_projection;
     glm::mat4 the_model;
     glm::mat4 the_view;
-    float rotation=0;//Rotação da nave baseada no precionamento de direita e esquerda
+
+    float rotation = 0;//Rotação da nave baseada no precionamento de direita e esquerda
+
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
@@ -413,9 +424,6 @@ int main(int argc, char* argv[])
         #define SPHERE 0
         #define SHIP 1
         #define PLANE  2
-        #define ROTATELIMIT 100
-        #define RV 1;
-        #define RVB 2;
         /*
         // Desenhamos o modelo da esfera
         model = Matrix_Translate(-1.0f,0.0f,0.0f);
@@ -466,7 +474,7 @@ int main(int argc, char* argv[])
 
         // Desenhamos o modelo do plano do chão
         model = Matrix_Translate(0.0f,-1.0f,0.0f)
-              * Matrix_Scale(2.0f,1.0f,2.0f);
+              * Matrix_Scale(10.0f,1.0f,10.0f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, PLANE);
         DrawVirtualObject("plane");
@@ -1059,7 +1067,9 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     float dy = ypos - g_LastCursorPosY;
 
     // Atualizamos parâmetros da câmera com os deslocamentos
-    g_CameraPhi   -= 0.01f*dy;
+    // Mudou de (-) para (+) para inverter os controles da camera que também controlam a nave,
+    // para dar a sensação de um controle de manche de um avião/nave
+    g_CameraPhi   += 0.005f*dy;
 
 
     // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
@@ -1105,13 +1115,21 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     if (key==GLFW_KEY_Q &&action ==GLFW_PRESS){
         rotateL=1;
     }
-    if (key == GLFW_KEY_W && action == GLFW_PRESS)
+    if ((key == GLFW_KEY_W && action == GLFW_PRESS) ||
+        ((key == GLFW_KEY_W && action == GLFW_PRESS) && (key == GLFW_KEY_A && action == GLFW_PRESS)) ||
+        ((key == GLFW_KEY_W && action == GLFW_PRESS) && (key == GLFW_KEY_D && action == GLFW_PRESS)) ||
+        ((key == GLFW_KEY_W && action == GLFW_PRESS) && (key == GLFW_KEY_A && action == GLFW_RELEASE)) ||
+        ((key == GLFW_KEY_W && action == GLFW_PRESS) && (key == GLFW_KEY_D && action == GLFW_RELEASE)))
     {
-        anda_cima=1;
+        acelerando = 1;
     }
-    if (key == GLFW_KEY_S && action == GLFW_PRESS)
+    if ((key == GLFW_KEY_S && action == GLFW_PRESS) ||
+        ((key == GLFW_KEY_S && action == GLFW_PRESS) && (key == GLFW_KEY_A && action == GLFW_PRESS)) ||
+        ((key == GLFW_KEY_S && action == GLFW_PRESS) && (key == GLFW_KEY_D && action == GLFW_PRESS)) ||
+        ((key == GLFW_KEY_S && action == GLFW_PRESS) && (key == GLFW_KEY_A && action == GLFW_RELEASE)) ||
+        ((key == GLFW_KEY_S && action == GLFW_PRESS) && (key == GLFW_KEY_D && action == GLFW_RELEASE)))
     {
-        anda_baixo=1;
+        freando = 1;            // Começa a parar de acelerar
     }
     if (key == GLFW_KEY_A && action == GLFW_PRESS)
     {
@@ -1129,13 +1147,21 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     {
         rotateL=0;
     }
-     if (key == GLFW_KEY_W && action == GLFW_RELEASE)
+     if ((key == GLFW_KEY_W && action == GLFW_RELEASE) ||
+         ((key == GLFW_KEY_W && action == GLFW_RELEASE) && (key == GLFW_KEY_A && action == GLFW_PRESS)) ||
+         ((key == GLFW_KEY_W && action == GLFW_RELEASE) && (key == GLFW_KEY_D && action == GLFW_PRESS)) ||
+         ((key == GLFW_KEY_W && action == GLFW_RELEASE) && (key == GLFW_KEY_A && action == GLFW_RELEASE)) ||
+         ((key == GLFW_KEY_W && action == GLFW_RELEASE) && (key == GLFW_KEY_D && action == GLFW_RELEASE)))
     {
-        anda_cima=0;
+        acelerando = 0;
     }
-    if (key == GLFW_KEY_S && action == GLFW_RELEASE)
+    if ((key == GLFW_KEY_S && action == GLFW_RELEASE) ||
+        ((key == GLFW_KEY_S && action == GLFW_RELEASE) && (key == GLFW_KEY_A && action == GLFW_PRESS)) ||
+        ((key == GLFW_KEY_S && action == GLFW_RELEASE) && (key == GLFW_KEY_D && action == GLFW_PRESS)) ||
+        ((key == GLFW_KEY_S && action == GLFW_RELEASE) && (key == GLFW_KEY_A && action == GLFW_RELEASE)) ||
+        ((key == GLFW_KEY_S && action == GLFW_RELEASE) && (key == GLFW_KEY_D && action == GLFW_RELEASE)))
     {
-        anda_baixo=0;
+        freando = 0;                // Agora a nave está parando de frear
     }
     if (key == GLFW_KEY_A && action == GLFW_RELEASE)
     {
@@ -1408,16 +1434,38 @@ void PrintObjModelInfo(ObjModel* model)
 
 void Anda()
 {
+    static float oldseconds = (float)glfwGetTime();
+    float seconds;
+    float ellapsed_seconds;
     float dx = anda_direita - anda_esquerda;
-    g_CameraTheta -= 0.01f*dx;
+    g_CameraTheta -= 0.001f*dx;
+    if(acelerando)                              // Enquanto W estiver sendo pressionado
+    {
+        seconds = (float)glfwGetTime();
+        ellapsed_seconds = seconds - oldseconds;
+        if(ellapsed_seconds > 0.1)
+        {
+            if (acelera_frente <= 0.0015)                // E se a nave não chegou na velocidade máxima
+                acelera_frente+= 0.00005;                    //aumenta a velocidade dela.
+            anda_cima = 1;                          // Permite a nave andar para frente
+            oldseconds = seconds;
+        }
+    }
+    if(freando)                                 // Enquanto W estiver sendo pressionado
+    {
+        seconds = (float)glfwGetTime();
+        ellapsed_seconds = seconds - oldseconds;
+        if(ellapsed_seconds > 0.1)
+        {
+            if (acelera_frente >= 0.0000)               // Se a nave não chegou na velocidade mínima
+                acelera_frente-= 0.00005;                    // diminui a velocidade
+            else                                        // Se a nave está na velocidade mínima (parada)
+                anda_cima = 0;                              // ela para de se mover
+            oldseconds = seconds;
+        }
+    }
     if (anda_cima == 1)
-    {
-        camera_position_c -=acelera * w;
-    }
-    if (anda_baixo == 1)
-    {
-        camera_position_c += acelera * w;
-    }
+        camera_position_c -=acelera_frente * w;     // Faz o deslocamento da câmera (nave).
     if(rotateR == 1){
         rotationX+=0.1f;
     }
