@@ -199,6 +199,8 @@ glm::vec4 camera_position_c=glm::vec4(0.0f,0.0f,0.0f,1.0f);;
 bool afterRotation=false;
 glm::vec4 u;
 glm::vec4 w;
+float atira=0;
+std::vector <std::pair<glm::mat4,glm::vec4>> tiros;
 
 int main(int argc, char* argv[])
 {
@@ -308,6 +310,7 @@ int main(int argc, char* argv[])
     glm::mat4 the_projection;
     glm::mat4 the_model;
     glm::mat4 the_view;
+    int itiro=0;
     float rotation=0;//Rotação da nave baseada no precionamento de direita e esquerda
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
@@ -453,15 +456,42 @@ int main(int argc, char* argv[])
                 rotation-=RV;
             }
         }
-
+        glm::mat4 modelaux;
         glm::vec3 up_ArWing=Matrix_Rotate_Y(g_CameraTheta)*Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*glm::vec4(0.0f,-0.3f,0.0f,0.0f);
         model = Matrix_Translate(camera_position_c.x+camera_view_vector.x+up_ArWing.x
                                  ,camera_position_c.y+camera_view_vector.y+up_ArWing.y,camera_position_c.z+camera_view_vector.z+up_ArWing.z)
+
                *Matrix_Scale(0.04f,0.04f,0.04f)*Matrix_Rotate_Y(g_CameraTheta)*
         Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*Matrix_Rotate_Z((rotation)*((3.14/2)*0.8)/ROTATELIMIT);
+
+        if(atira){
+            itiro+=1;
+            tiros.push_back(std::make_pair(model*Matrix_Scale(0.5,0.5,0.5),glm::vec4(camera_view_vector.x,camera_view_vector.y,camera_view_vector.z,0.0)));
+        }
+        for(int i=0;i<tiros.size();i++){
+            tiros[i].first=Matrix_Translate(tiros[i].second.x*0000.1,tiros[i].second.y*0000.1,tiros[i].second.z*0000.1)*tiros[i].first;
+            model=tiros[i].first;
+            glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(object_id_uniform, SPHERE);
+            DrawVirtualObject("sphere");
+        }
+         up_ArWing=Matrix_Rotate_Y(g_CameraTheta)*Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*glm::vec4(0.0f,-0.3f,0.0f,0.0f);
+        model = Matrix_Translate(camera_position_c.x+camera_view_vector.x+up_ArWing.x
+                                 ,camera_position_c.y+camera_view_vector.y+up_ArWing.y,camera_position_c.z+camera_view_vector.z+up_ArWing.z)
+
+               *Matrix_Scale(0.04f,0.04f,0.04f)*Matrix_Rotate_Y(g_CameraTheta)*
+        Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*Matrix_Rotate_Z((rotation)*((3.14/2)*0.8)/ROTATELIMIT);
+
+
+
         glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(object_id_uniform, SHIP);
         DrawVirtualObject("Arwing_SNES_Vert.001");
+
+
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, PLANE);
+        DrawVirtualObject("plane");
 
 
         // Desenhamos o modelo do plano do chão
@@ -1145,17 +1175,14 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     {
         anda_direita=0;
     }
-
+    if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE)
+    {
+        atira=0;
+    }
     // Se o usuário apertar a tecla espaço, resetamos os ângulos de Euler para zero.
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
     {
-        g_AngleX = 0.0f;
-        g_AngleY = 0.0f;
-        g_AngleZ = 0.0f;
-        g_ForearmAngleX = 0.0f;
-        g_ForearmAngleZ = 0.0f;
-        g_TorsoPositionX = 0.0f;
-        g_TorsoPositionY = 0.0f;
+        atira=1;
     }
 
     // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
