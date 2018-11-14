@@ -39,6 +39,7 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 // Headers da biblioteca para carregar modelos obj
 #include <tiny_obj_loader.h>
@@ -186,18 +187,27 @@ GLint model_uniform;
 GLint view_uniform;
 GLint projection_uniform;
 GLint object_id_uniform;
-int anda_cima=0;
-int anda_baixo=0;
-int anda_direita=0;
-int anda_esquerda=0;
+
 float rotationX = 0.00f;
 int rotateR =0;
 int rotateL =0;
-float acelera=0.01f;
 glm::vec4 camera_position_c=glm::vec4(0.0f,0.0f,0.0f,1.0f);;
 bool afterRotation=false;
 glm::vec4 u;
 glm::vec4 w;
+
+// Variáveis de movimentação da nave.
+int anda_cima = 0;
+int anda_direita = 0;
+int anda_esquerda = 0;
+float acelera_frente = 0.00000f;
+int acelerando = 0;                     // indica se a nave está acelerando no momento
+int freando = 0;
+
+// Constantes de movimentação da nave.
+#define ROTATELIMIT 350                 // limite de rotação da nave quando ela anda para a direita ou esquerda.
+#define RV 1;
+#define RVB 2;
 
 int main(int argc, char* argv[])
 {
@@ -228,7 +238,7 @@ int main(int argc, char* argv[])
     // Criamos uma janela do sistema operacional, com 800 colunas e 600 linhas
     // de pixels, e com título "INF01047 ...".
     GLFWwindow* window;
-    window = glfwCreateWindow(800, 600, "INF01047 - 00287702 - Leonardo Holtz de Oliveira", NULL, NULL);
+    window = glfwCreateWindow(800, 600, "Battle Ship", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -308,6 +318,8 @@ int main(int argc, char* argv[])
     glm::mat4 the_model;
     glm::mat4 the_view;
 
+    float rotation = 0;//Rotação da nave baseada no precionamento de direita e esquerda
+
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
@@ -320,6 +332,7 @@ int main(int argc, char* argv[])
         //
         //           R     G     B     A
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        Anda();
 
         // "Pintamos" todos os pixels do framebuffer com a cor definida acima,
         // e também resetamos todos os pixels do Z-buffer (depth buffer).
@@ -354,7 +367,6 @@ int main(int argc, char* argv[])
         float y = r;
         float z = r;
         float x = r;
-
         // Abaixo definimos as varáveis que efetivamente definem a câmera virtual.
         // Veja slides 165-175 do documento "Aula_08_Sistemas_de_Coordenadas.pdf".
         glm::vec4 camera_lookat_l    = glm::vec4(x,y,z,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
@@ -401,7 +413,6 @@ int main(int argc, char* argv[])
             float l = -r;
             projection = Matrix_Orthographic(l, r, b, t, nearplane, farplane);
         }
-        Anda();
         glm::mat4 model = Matrix_Identity(); // Transformação identidade de modelagem
 
         // Enviamos as matrizes "view" e "projection" para a placa de vídeo
@@ -413,7 +424,6 @@ int main(int argc, char* argv[])
         #define SPHERE 0
         #define SHIP 1
         #define PLANE  2
-
         /*
         // Desenhamos o modelo da esfera
         model = Matrix_Translate(-1.0f,0.0f,0.0f);
@@ -421,13 +431,42 @@ int main(int argc, char* argv[])
         glUniform1i(object_id_uniform, SPHERE);
         DrawVirtualObject("sphere");
         */
+        int dx = anda_esquerda-anda_direita;
+        if(dx==0){
+            if(rotation==0){
+                rotation=0;
+            }
+            else{
+                if(rotation>0){
+                    rotation-=RVB;
+                    if(rotation<0){
+                        rotation=0;
+                    }
+                }
+                else{
+                    rotation+=RVB;
+                    if(rotation>0){
+                        rotation=0;
+                    }
+                }
+            }
+        }
+        if(dx>0){
+            if(rotation<ROTATELIMIT){
+                rotation+=RV;
+            }
+        }
+        else if(dx<0){
+            if(rotation>-ROTATELIMIT){
+                rotation-=RV;
+            }
+        }
 
-        // Desenhamos o modelo da nave espacial
         glm::vec3 up_ArWing=Matrix_Rotate_Y(g_CameraTheta)*Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*glm::vec4(0.0f,-0.3f,0.0f,0.0f);
         model = Matrix_Translate(camera_position_c.x+camera_view_vector.x+up_ArWing.x
                                  ,camera_position_c.y+camera_view_vector.y+up_ArWing.y,camera_position_c.z+camera_view_vector.z+up_ArWing.z)
                *Matrix_Scale(0.04f,0.04f,0.04f)*Matrix_Rotate_Y(g_CameraTheta)*
-        Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2);
+        Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*Matrix_Rotate_Z((rotation)*((3.14/2)*0.8)/ROTATELIMIT);
         glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(object_id_uniform, SHIP);
         DrawVirtualObject("Arwing_SNES_Vert.001");
@@ -435,7 +474,7 @@ int main(int argc, char* argv[])
 
         // Desenhamos o modelo do plano do chão
         model = Matrix_Translate(0.0f,-1.0f,0.0f)
-              * Matrix_Scale(2.0f,1.0f,2.0f);
+              * Matrix_Scale(10.0f,1.0f,10.0f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, PLANE);
         DrawVirtualObject("plane");
@@ -555,6 +594,69 @@ void PopMatrix(glm::mat4& M)
     {
         M = g_MatrixStack.top();
         g_MatrixStack.pop();
+    }
+}
+void ComputeNormalsPhong(ObjModel* model)
+{
+    if ( !model->attrib.normals.empty() )
+        return;
+
+    // Primeiro computamos as normais para todos os TRIÂNGULOS.
+    // Segundo, computamos as normais dos VÉRTICES através do método proposto
+    // por Gourad, onde a normal de cada vértice vai ser a média das normais de
+    // todas as faces que compartilham este vértice.
+
+    size_t num_vertices = model->attrib.vertices.size() / 3;
+
+    std::vector<int> num_triangles_per_vertex(num_vertices, 0);
+    std::vector<glm::vec4> vertex_normals(num_vertices, glm::vec4(0.0f,0.0f,0.0f,0.0f));
+
+    for (size_t shape = 0; shape < model->shapes.size(); ++shape)
+    {
+        size_t num_triangles = model->shapes[shape].mesh.num_face_vertices.size();
+
+        for (size_t triangle = 0; triangle < num_triangles; ++triangle)
+        {
+            assert(model->shapes[shape].mesh.num_face_vertices[triangle] == 3);
+
+            glm::vec4  vertices[3];
+            for (size_t vertex = 0; vertex < 3; ++vertex)
+            {
+                tinyobj::index_t idx = model->shapes[shape].mesh.indices[3*triangle + vertex];
+                const float vx = model->attrib.vertices[3*idx.vertex_index + 0];
+                const float vy = model->attrib.vertices[3*idx.vertex_index + 1];
+                const float vz = model->attrib.vertices[3*idx.vertex_index + 2];
+                vertices[vertex] = glm::vec4(vx,vy,vz,1.0);
+            }
+
+            const glm::vec4  a = vertices[0];
+            const glm::vec4  b = vertices[1];
+            const glm::vec4  c = vertices[2];
+
+            // PREENCHA AQUI o cálculo da normal de um triângulo cujos vértices
+            // estão nos pontos "a", "b", e "c", definidos no sentido anti-horário.
+            const glm::vec4  n = crossproduct(b - a, c - a);
+            // preenchido
+
+            for (size_t vertex = 0; vertex < 3; ++vertex)
+            {
+                tinyobj::index_t idx = model->shapes[shape].mesh.indices[3*triangle + vertex];
+                num_triangles_per_vertex[idx.vertex_index] += 1;
+                vertex_normals[idx.vertex_index] += n;
+                model->shapes[shape].mesh.indices[3*triangle + vertex].normal_index = idx.vertex_index;
+            }
+        }
+    }
+
+    model->attrib.normals.resize( 3*num_vertices );
+
+    for (size_t i = 0; i < vertex_normals.size(); ++i)
+    {
+        glm::vec4 n = vertex_normals[i] / (float)num_triangles_per_vertex[i];
+        n /= norm(n);
+        model->attrib.normals[3*i + 0] = n.x;
+        model->attrib.normals[3*i + 1] = n.y;
+        model->attrib.normals[3*i + 2] = n.z;
     }
 }
 
@@ -930,7 +1032,22 @@ double g_LastCursorPosX, g_LastCursorPosY;
 // Função callback chamada sempre que o usuário aperta algum dos botões do mouse
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
-
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+    {
+        // Se o usuário pressionou o botão esquerdo do mouse, guardamos a
+        // posição atual do cursor nas variáveis g_LastCursorPosX e
+        // g_LastCursorPosY.  Também, setamos a variável
+        // g_LeftMouseButtonPressed como true, para saber que o usuário está
+        // com o botão esquerdo pressionado.
+        glfwGetCursorPos(window, &g_LastCursorPosX, &g_LastCursorPosY);
+        g_LeftMouseButtonPressed = true;
+    }
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+    {
+        // Quando o usuário soltar o botão esquerdo do mouse, atualizamos a
+        // variável abaixo para false.
+        g_LeftMouseButtonPressed = false;
+    }
 }
 
 // Função callback chamada sempre que o usuário movimentar o cursor do mouse em
@@ -943,63 +1060,32 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     // parâmetros que definem a posição da câmera dentro da cena virtual.
     // Assim, temos que o usuário consegue controlar a câmera.
 
-    if (g_LeftMouseButtonPressed)
-    {
-        // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
-        float dx = xpos - g_LastCursorPosX;
-        float dy = ypos - g_LastCursorPosY;
+    if (!g_LeftMouseButtonPressed)
+        return;
 
-        // Atualizamos parâmetros da câmera com os deslocamentos
-        g_CameraTheta -= 0.001f*dx;
-        g_CameraPhi   += 0.001f*dy;
+    // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
+    float dy = ypos - g_LastCursorPosY;
 
-        // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
-        float phimax = 3.141592f/2;
-        float phimin = -phimax;
+    // Atualizamos parâmetros da câmera com os deslocamentos
+    // Mudou de (-) para (+) para inverter os controles da camera que também controlam a nave,
+    // para dar a sensação de um controle de manche de um avião/nave
+    g_CameraPhi   += 0.005f*dy;
 
-        if (g_CameraPhi > phimax)
-            g_CameraPhi = phimax;
 
-        if (g_CameraPhi < phimin)
-            g_CameraPhi = phimin;
+    // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
+    float phimax = 3.141592f/2;
+    float phimin = -phimax;
 
-        // Atualizamos as variáveis globais para armazenar a posição atual do
-        // cursor como sendo a última posição conhecida do cursor.
-        g_LastCursorPosX = xpos;
-        g_LastCursorPosY = ypos;
-    }
+    if (g_CameraPhi > phimax)
+        g_CameraPhi = phimax;
 
-    if (g_RightMouseButtonPressed)
-    {
-        // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
-        float dx = xpos - g_LastCursorPosX;
-        float dy = ypos - g_LastCursorPosY;
+    if (g_CameraPhi < phimin)
+        g_CameraPhi = phimin;
 
-        // Atualizamos parâmetros da antebraço com os deslocamentos
-        g_ForearmAngleZ -= 0.01f*dx;
-        g_ForearmAngleX += 0.01f*dy;
-
-        // Atualizamos as variáveis globais para armazenar a posição atual do
-        // cursor como sendo a última posição conhecida do cursor.
-        g_LastCursorPosX = xpos;
-        g_LastCursorPosY = ypos;
-    }
-
-    if (g_MiddleMouseButtonPressed)
-    {
-        // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
-        float dx = xpos - g_LastCursorPosX;
-        float dy = ypos - g_LastCursorPosY;
-
-        // Atualizamos parâmetros da antebraço com os deslocamentos
-        g_TorsoPositionX += 0.01f*dx;
-        g_TorsoPositionY -= 0.01f*dy;
-
-        // Atualizamos as variáveis globais para armazenar a posição atual do
-        // cursor como sendo a última posição conhecida do cursor.
-        g_LastCursorPosX = xpos;
-        g_LastCursorPosY = ypos;
-    }
+    // Atualizamos as variáveis globais para armazenar a posição atual do
+    // cursor como sendo a última posição conhecida do cursor.
+    g_LastCursorPosX = xpos;
+    g_LastCursorPosY = ypos;
 }
 
 // Função callback chamada sempre que o usuário movimenta a "rodinha" do mouse.
@@ -1029,13 +1115,21 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     if (key==GLFW_KEY_Q &&action ==GLFW_PRESS){
         rotateL=1;
     }
-    if (key == GLFW_KEY_W && action == GLFW_PRESS)
+    if ((key == GLFW_KEY_W && action == GLFW_PRESS) ||
+        ((key == GLFW_KEY_W && action == GLFW_PRESS) && (key == GLFW_KEY_A && action == GLFW_PRESS)) ||
+        ((key == GLFW_KEY_W && action == GLFW_PRESS) && (key == GLFW_KEY_D && action == GLFW_PRESS)) ||
+        ((key == GLFW_KEY_W && action == GLFW_PRESS) && (key == GLFW_KEY_A && action == GLFW_RELEASE)) ||
+        ((key == GLFW_KEY_W && action == GLFW_PRESS) && (key == GLFW_KEY_D && action == GLFW_RELEASE)))
     {
-        anda_cima=1;
+        acelerando = 1;
     }
-    if (key == GLFW_KEY_S && action == GLFW_PRESS)
+    if ((key == GLFW_KEY_S && action == GLFW_PRESS) ||
+        ((key == GLFW_KEY_S && action == GLFW_PRESS) && (key == GLFW_KEY_A && action == GLFW_PRESS)) ||
+        ((key == GLFW_KEY_S && action == GLFW_PRESS) && (key == GLFW_KEY_D && action == GLFW_PRESS)) ||
+        ((key == GLFW_KEY_S && action == GLFW_PRESS) && (key == GLFW_KEY_A && action == GLFW_RELEASE)) ||
+        ((key == GLFW_KEY_S && action == GLFW_PRESS) && (key == GLFW_KEY_D && action == GLFW_RELEASE)))
     {
-        anda_baixo=1;
+        freando = 1;            // Começa a parar de acelerar
     }
     if (key == GLFW_KEY_A && action == GLFW_PRESS)
     {
@@ -1053,13 +1147,21 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     {
         rotateL=0;
     }
-     if (key == GLFW_KEY_W && action == GLFW_RELEASE)
+     if ((key == GLFW_KEY_W && action == GLFW_RELEASE) ||
+         ((key == GLFW_KEY_W && action == GLFW_RELEASE) && (key == GLFW_KEY_A && action == GLFW_PRESS)) ||
+         ((key == GLFW_KEY_W && action == GLFW_RELEASE) && (key == GLFW_KEY_D && action == GLFW_PRESS)) ||
+         ((key == GLFW_KEY_W && action == GLFW_RELEASE) && (key == GLFW_KEY_A && action == GLFW_RELEASE)) ||
+         ((key == GLFW_KEY_W && action == GLFW_RELEASE) && (key == GLFW_KEY_D && action == GLFW_RELEASE)))
     {
-        anda_cima=0;
+        acelerando = 0;
     }
-    if (key == GLFW_KEY_S && action == GLFW_RELEASE)
+    if ((key == GLFW_KEY_S && action == GLFW_RELEASE) ||
+        ((key == GLFW_KEY_S && action == GLFW_RELEASE) && (key == GLFW_KEY_A && action == GLFW_PRESS)) ||
+        ((key == GLFW_KEY_S && action == GLFW_RELEASE) && (key == GLFW_KEY_D && action == GLFW_PRESS)) ||
+        ((key == GLFW_KEY_S && action == GLFW_RELEASE) && (key == GLFW_KEY_A && action == GLFW_RELEASE)) ||
+        ((key == GLFW_KEY_S && action == GLFW_RELEASE) && (key == GLFW_KEY_D && action == GLFW_RELEASE)))
     {
-        anda_baixo=0;
+        freando = 0;                // Agora a nave está parando de frear
     }
     if (key == GLFW_KEY_A && action == GLFW_RELEASE)
     {
@@ -1332,23 +1434,38 @@ void PrintObjModelInfo(ObjModel* model)
 
 void Anda()
 {
-    std::cout<<anda_cima<<std::endl;
+    static float oldseconds = (float)glfwGetTime();
+    float seconds;
+    float ellapsed_seconds;
+    float dx = anda_direita - anda_esquerda;
+    g_CameraTheta -= 0.001f*dx;
+    if(acelerando)                              // Enquanto W estiver sendo pressionado
+    {
+        seconds = (float)glfwGetTime();
+        ellapsed_seconds = seconds - oldseconds;
+        if(ellapsed_seconds > 0.1)
+        {
+            if (acelera_frente <= 0.0015)                // E se a nave não chegou na velocidade máxima
+                acelera_frente+= 0.00005;                    //aumenta a velocidade dela.
+            anda_cima = 1;                          // Permite a nave andar para frente
+            oldseconds = seconds;
+        }
+    }
+    if(freando)                                 // Enquanto W estiver sendo pressionado
+    {
+        seconds = (float)glfwGetTime();
+        ellapsed_seconds = seconds - oldseconds;
+        if(ellapsed_seconds > 0.1)
+        {
+            if (acelera_frente >= 0.0000)               // Se a nave não chegou na velocidade mínima
+                acelera_frente-= 0.00005;                    // diminui a velocidade
+            else                                        // Se a nave está na velocidade mínima (parada)
+                anda_cima = 0;                              // ela para de se mover
+            oldseconds = seconds;
+        }
+    }
     if (anda_cima == 1)
-    {
-        camera_position_c -=acelera * w;
-    }
-    if (anda_baixo == 1)
-    {
-        camera_position_c += acelera * w;
-    }
-    if (anda_esquerda == 1)
-    {
-        camera_position_c -= acelera * u;
-    }
-    if (anda_direita == 1)
-    {
-        camera_position_c +=acelera * u;
-    }
+        camera_position_c -=acelera_frente * w;     // Faz o deslocamento da câmera (nave).
     if(rotateR == 1){
         rotationX+=0.1f;
     }
