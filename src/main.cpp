@@ -204,6 +204,10 @@ float acelera_frente = 0.00000f;
 int acelerando = 0;                     // indica se a nave está acelerando no momento
 int freando = 0;
 
+// Tiro da nave
+float atira=0;
+std::vector <std::pair<glm::mat4,glm::vec4>> tiros;
+
 // Constantes de movimentação da nave.
 #define ROTATELIMIT 350                 // limite de rotação da nave quando ela anda para a direita ou esquerda.
 #define RV 1;
@@ -318,7 +322,8 @@ int main(int argc, char* argv[])
     glm::mat4 the_model;
     glm::mat4 the_view;
 
-    float rotation = 0;//Rotação da nave baseada no precionamento de direita e esquerda
+    int itiro = 0;      // Booleano para o tiro da nave
+    float rotation = 0; //Rotação da nave baseada no precionamento de direita e esquerda
 
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
@@ -332,6 +337,8 @@ int main(int argc, char* argv[])
         //
         //           R     G     B     A
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+
+        // Fazemos a chamada da função de movimentação da nave, onde é calculada sua velocidade.
         Anda();
 
         // "Pintamos" todos os pixels do framebuffer com a cor definida acima,
@@ -391,7 +398,7 @@ int main(int argc, char* argv[])
         // Note que, no sistema de coordenadas da câmera, os planos near e far
         // estão no sentido negativo! Veja slides 190-193 do documento "Aula_09_Projecoes.pdf".
         float nearplane = -0.1f;  // Posição do "near plane"
-        float farplane  = -10.0f; // Posição do "far plane"
+        float farplane  = -20.0f; // Posição do "far plane"
 
         if (g_UsePerspectiveProjection)
         {
@@ -432,45 +439,61 @@ int main(int argc, char* argv[])
         DrawVirtualObject("sphere");
         */
         int dx = anda_esquerda-anda_direita;
-        if(dx==0){
-            if(rotation==0){
-                rotation=0;
+        if(dx == 0){
+            if(rotation == 0){
+                rotation = 0;
             }
             else{
-                if(rotation>0){
-                    rotation-=RVB;
-                    if(rotation<0){
-                        rotation=0;
+                if(rotation > 0){
+                    rotation -= RVB;
+                    if(rotation < 0){
+                        rotation = 0;
                     }
                 }
                 else{
-                    rotation+=RVB;
-                    if(rotation>0){
-                        rotation=0;
+                    rotation += RVB;
+                    if(rotation > 0){
+                        rotation = 0;
                     }
                 }
             }
         }
-        if(dx>0){
-            if(rotation<ROTATELIMIT){
-                rotation+=RV;
+        if(dx > 0){
+            if(rotation < ROTATELIMIT){
+                rotation += RV;
             }
         }
-        else if(dx<0){
-            if(rotation>-ROTATELIMIT){
-                rotation-=RV;
+        else if(dx < 0){
+            if(rotation >- ROTATELIMIT){
+                rotation -= RV;
             }
         }
 
+        glm::mat4 modelaux;
+
         glm::vec3 up_ArWing=Matrix_Rotate_Y(g_CameraTheta)*Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*glm::vec4(0.0f,-0.3f,0.0f,0.0f);
         model = Matrix_Translate(camera_position_c.x+camera_view_vector.x+up_ArWing.x
-                                 ,camera_position_c.y+camera_view_vector.y+up_ArWing.y,camera_position_c.z+camera_view_vector.z+up_ArWing.z)
-               *Matrix_Scale(0.04f,0.04f,0.04f)*Matrix_Rotate_Y(g_CameraTheta)*
-        Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*Matrix_Rotate_Z((rotation)*((3.14/2)*0.8)/ROTATELIMIT);
+                                 ,camera_position_c.y+camera_view_vector.y+up_ArWing.y,camera_position_c.z+camera_view_vector.z+up_ArWing.z)*
+                Matrix_Scale(0.04f,0.04f,0.04f)*Matrix_Rotate_Y(g_CameraTheta)*
+                Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*Matrix_Rotate_Z((rotation)*((3.14/2)*0.8)/ROTATELIMIT);
         glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(object_id_uniform, SHIP);
         DrawVirtualObject("Arwing_SNES_Vert.001");
 
+        // Detecta se ouve tiro ou não
+        if(atira)
+        {
+            itiro+=1;
+            tiros.push_back(std::make_pair(model*Matrix_Scale(0.1,0.1,0.1),glm::vec4(camera_view_vector.x,camera_view_vector.y,camera_view_vector.z,0.0)));
+        }
+        for(int i=0;i<tiros.size();i++)
+        {
+            tiros[i].first=Matrix_Translate(tiros[i].second.x*0000.1,tiros[i].second.y*0000.1,tiros[i].second.z*0000.1)*tiros[i].first;
+            model=tiros[i].first;
+            glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(object_id_uniform, SPHERE);
+            DrawVirtualObject("sphere");
+        }
 
         // Desenhamos o modelo do plano do chão
         model = Matrix_Translate(0.0f,-1.0f,0.0f)
@@ -1153,7 +1176,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
          ((key == GLFW_KEY_W && action == GLFW_RELEASE) && (key == GLFW_KEY_A && action == GLFW_RELEASE)) ||
          ((key == GLFW_KEY_W && action == GLFW_RELEASE) && (key == GLFW_KEY_D && action == GLFW_RELEASE)))
     {
-        acelerando = 0;
+        acelerando = 0;                // Agora a nave está parando de acelerar
     }
     if ((key == GLFW_KEY_S && action == GLFW_RELEASE) ||
         ((key == GLFW_KEY_S && action == GLFW_RELEASE) && (key == GLFW_KEY_A && action == GLFW_PRESS)) ||
@@ -1175,13 +1198,14 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     // Se o usuário apertar a tecla espaço, resetamos os ângulos de Euler para zero.
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
     {
-        g_AngleX = 0.0f;
-        g_AngleY = 0.0f;
-        g_AngleZ = 0.0f;
-        g_ForearmAngleX = 0.0f;
-        g_ForearmAngleZ = 0.0f;
-        g_TorsoPositionX = 0.0f;
-        g_TorsoPositionY = 0.0f;
+        //g_AngleX = 0.0f;
+        //g_AngleY = 0.0f;
+        //g_AngleZ = 0.0f;
+        //g_ForearmAngleX = 0.0f;
+        //g_ForearmAngleZ = 0.0f;
+        //g_TorsoPositionX = 0.0f;
+        //g_TorsoPositionY = 0.0f;
+        atira = 1;
     }
 
     // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
@@ -1476,4 +1500,3 @@ void Anda()
 
 // set makeprg=cd\ ..\ &&\ make\ run\ >/dev/null
 // vim: set spell spelllang=pt_br :
-
