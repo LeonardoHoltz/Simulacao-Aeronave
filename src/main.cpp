@@ -1194,7 +1194,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     {
         anda_direita=0;
     }
-	
+
     // Se o usuário apertar a tecla espaço, resetamos os ângulos de Euler para zero.
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
     {
@@ -1462,6 +1462,7 @@ void PrintObjModelInfo(ObjModel* model)
 void Anda()
 {
     static float oldseconds = (float)glfwGetTime();
+    static float oldseconds2 = (float)glfwGetTime();
     float seconds;
     float ellapsed_seconds;
     float dx = anda_direita - anda_esquerda;
@@ -1492,7 +1493,15 @@ void Anda()
         }
     }
     if (anda_cima == 1)
-        camera_position_c -=acelera_frente * w;     // Faz o deslocamento da câmera (nave).
+    {
+        seconds = (float)glfwGetTime();
+        ellapsed_seconds = seconds - oldseconds;
+        if(ellapsed_seconds > 0.01)
+        {
+            oldseconds2 = seconds;
+            camera_position_c -= acelera_frente * w;     // Faz o deslocamento da câmera (nave).
+        }
+    }
     if(rotateR == 1){
         rotationX+=0.1f;
     }
@@ -1500,6 +1509,6 @@ void Anda()
         rotationX-=0.1f;
     }
 }
-
+// AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 // set makeprg=cd\ ..\ &&\ make\ run\ >/dev/null
 // vim: set spell spelllang=pt_br :
