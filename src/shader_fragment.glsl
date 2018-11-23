@@ -18,6 +18,8 @@ uniform mat4 projection;
 #define SPHERE 0
 #define SHIP 1
 #define PLANE  2
+#define COW 3
+#define COWTWO 5
 uniform int object_id;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
@@ -87,6 +89,12 @@ void main()
         q = 20.0;
         // preenchido
     }
+    else if(object_id== COWTWO){
+        Kd = vec3(0.8,0.4,0.08);
+        Ks = vec3(0.0,0.0,0.0);
+        Ka = vec3(0.4,0.2,0.04);
+        q = 1.0;
+    }
     else // Objeto desconhecido = preto
     {
         Kd = vec3(0.0,0.0,0.0);
@@ -121,7 +129,17 @@ void main()
 
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
-    color = pow(colorGormet, vec3(1.0,1.0,1.0)/2.2);
+    if(object_id==COWTWO){
+    color = pow(color, vec3(1.0,1.0,1.0)/2.2);
+    }
+    else{
+    if(object_id==SHIP){
+    color = pow(lambert_diffuse_term, vec3(1.0,1.0,1.0)/2.2);
+    }
+    else{
+    color = pow(colorGormet,vec3(1.0,1.0,1.0)/2.2);
+    }
+    }
 
 }
 

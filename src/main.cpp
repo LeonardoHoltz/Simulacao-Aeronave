@@ -40,6 +40,7 @@
 #include <glm/vec4.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <math.h>
 
 // Headers da biblioteca para carregar modelos obj
 #include <tiny_obj_loader.h>
@@ -129,6 +130,8 @@ struct SceneObject
     int          num_indices; // Número de índices do objeto dentro do vetor indices[] definido em BuildTrianglesAndAddToVirtualScene()
     GLenum       rendering_mode; // Modo de rasterização (GL_TRIANGLES, GL_TRIANGLE_STRIP, etc.)
     GLuint       vertex_array_object_id; // ID do VAO onde estão armazenados os atributos do modelo
+    glm::vec3    bbox_min; // Axis-Aligned Bounding Box do objeto
+    glm::vec3    bbox_max;
 };
 
 // Abaixo definimos variáveis globais utilizadas em várias funções do código.
@@ -178,6 +181,7 @@ bool g_UsePerspectiveProjection = true;
 // Variável que controla se o texto informativo será mostrado na tela.
 bool g_ShowInfoText = true;
 bool Look_at =false;
+int primeiro=0;
 
 // Variáveis que definem um programa de GPU (shaders). Veja função LoadShadersFromFiles().
 GLuint vertex_shader_id;
@@ -203,18 +207,20 @@ int anda_esquerda = 0;
 float acelera_frente = 0.00000f;
 int acelerando = 0;                     // indica se a nave está acelerando no momento
 int freando = 0;
-
 // Tiro da nave
 float atira=0;
 std::vector <std::pair<glm::mat4,glm::vec4>> tiros;
-
+double tprev=glfwGetTime();
+double tnow;
+double deltat;
 // Constantes de movimentação da nave.
-#define ROTATELIMIT 350                 // limite de rotação da nave quando ela anda para a direita ou esquerda.
+#define ROTATELIMIT 25                // limite de rotação da nave quando ela anda para a direita ou esquerda               // limite de rotação da nave quando ela anda para a direita ou esquerda.
 #define RV 1;
 #define RVB 2;
 
 int main(int argc, char* argv[])
 {
+
     // Inicializamos a biblioteca GLFW, utilizada para criar uma janela do
     // sistema operacional, onde poderemos renderizar com OpenGL.
     int success = glfwInit();
@@ -299,6 +305,10 @@ int main(int argc, char* argv[])
     ComputeNormals(&planemodel);
     BuildTrianglesAndAddToVirtualScene(&planemodel);
 
+    ObjModel cow("../../data/cow.obj");
+    ComputeNormals(&cow);
+    BuildTrianglesAndAddToVirtualScene(&cow);
+
     if ( argc > 1 )
     {
         ObjModel model(argv[1]);
@@ -328,6 +338,10 @@ int main(int argc, char* argv[])
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
+
+        double tnow=glfwGetTime();
+        deltat = tnow- tprev;
+        tprev=tnow;
         // Aqui executamos as operações de renderização
 
         // Definimos a cor do "fundo" do framebuffer como branco.  Tal cor é
@@ -340,7 +354,6 @@ int main(int argc, char* argv[])
 
         // Fazemos a chamada da função de movimentação da nave, onde é calculada sua velocidade.
         Anda();
-
         // "Pintamos" todos os pixels do framebuffer com a cor definida acima,
         // e também resetamos todos os pixels do Z-buffer (depth buffer).
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -431,6 +444,8 @@ int main(int argc, char* argv[])
         #define SPHERE 0
         #define SHIP 1
         #define PLANE  2
+        #define COW 3
+        #define COWTWO 5
         /*
         // Desenhamos o modelo da esfera
         model = Matrix_Translate(-1.0f,0.0f,0.0f);
@@ -483,12 +498,14 @@ int main(int argc, char* argv[])
         // Detecta se ouve tiro ou não
         if(atira)
         {
+            primeiro=1;
+            atira=0;
             itiro+=1;
-            tiros.push_back(std::make_pair(model*Matrix_Scale(0.1,0.1,0.1),glm::vec4(camera_view_vector.x,camera_view_vector.y,camera_view_vector.z,0.0)));
+            tiros.push_back(std::make_pair(model*Matrix_Scale(0.3,0.3,0.3),glm::vec4(camera_view_vector.x,camera_view_vector.y,camera_view_vector.z,0.0)));
         }
         for(int i=0;i<tiros.size();i++)
         {
-            tiros[i].first=Matrix_Translate(tiros[i].second.x*0000.1,tiros[i].second.y*0000.1,tiros[i].second.z*0000.1)*tiros[i].first;
+            tiros[i].first=Matrix_Translate(tiros[i].second.x*2*deltat,tiros[i].second.y*2*deltat,tiros[i].second.z*2*deltat)*tiros[i].first;
             model=tiros[i].first;
             glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(object_id_uniform, SPHERE);
@@ -501,6 +518,23 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, PLANE);
         DrawVirtualObject("plane");
+
+        model = Matrix_Translate(1.0f,1.0f,0.0f)*Matrix_Scale(0.3f,0.3f,0.3f);
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, COW);
+        DrawVirtualObject("cow");
+
+        model = Matrix_Translate(-1.0f,1.0f,0.0f)*Matrix_Scale(0.3f,0.3f,0.3f);
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, COWTWO);
+        DrawVirtualObject("cow");
+
+        model = Matrix_Translate(0.5f,1.0f,1.0f)*Matrix_Scale(0.3f,0.3f,0.3f);
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, SPHERE);
+        DrawVirtualObject("sphere");
+
+
 
 
         // Pegamos um vértice com coordenadas de modelo (0.5, 0.5, 0.5, 1) e o
@@ -530,6 +564,23 @@ int main(int argc, char* argv[])
 
     // Fim do programa
     return 0;
+}
+
+//Funcões de contato
+bool isPointBox(glm::vec4 point,glm::vec3 boxmin,glm::vec3 boxmax){
+  return((point.x>=boxmin.x && point.x<=boxmax.x)&&
+         (point.y>=boxmin.y && point.y<=boxmax.y)&&
+         (point.z>=boxmin.z&&point.z<=boxmax.z));
+}
+bool isPointCircle(glm::vec4 point,glm::vec3 circle,float raio){
+  float distance =std::sqrt((point.x-circle.x)*(point.x-circle.x)+(point.y-circle.y)*(point.y-circle.y)+(point.z-circle.z)*(point.z-circle.z));
+  return distance<raio;
+}
+bool boxintersect(glm::vec3 boxmin1,glm::vec3 boxmax1,glm::vec3 boxmin2,glm::vec3 boxmax2){
+    return((boxmin1.x<=boxmax2.x)&&(boxmax1.x>=boxmin2.x)&&
+           (boxmin1.y<=boxmax2.y)&&(boxmax1.y>=boxmin2.y)&&
+           (boxmin1.z<=boxmax2.z)&&(boxmax1.z>=boxmin2.z)
+           );
 }
 
 // Função que desenha um objeto armazenado em g_VirtualScene. Veja definição
@@ -1092,7 +1143,7 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     // Atualizamos parâmetros da câmera com os deslocamentos
     // Mudou de (-) para (+) para inverter os controles da camera que também controlam a nave,
     // para dar a sensação de um controle de manche de um avião/nave
-    g_CameraPhi   += 0.005f*dy;
+    g_CameraPhi   += 0.5f*dy*deltat;
 
 
     // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
@@ -1194,9 +1245,11 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     {
         anda_direita=0;
     }
-
+    if(primeiro==1){
+        atira=0;
+    }
     // Se o usuário apertar a tecla espaço, resetamos os ângulos de Euler para zero.
-    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS &&primeiro!= 1)
     {
         //g_AngleX = 0.0f;
         //g_AngleY = 0.0f;
@@ -1206,9 +1259,11 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         //g_TorsoPositionX = 0.0f;
         //g_TorsoPositionY = 0.0f;
         atira = 1;
+        primeiro=1;
     }
     if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE)
     {
+        primeiro=0;
         atira = 0;
     }
     // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
@@ -1466,41 +1521,29 @@ void Anda()
     float seconds;
     float ellapsed_seconds;
     float dx = anda_direita - anda_esquerda;
-    g_CameraTheta -= 0.001f*dx;
+    g_CameraTheta -= 1.0f*dx*deltat;
     if(acelerando)                              // Enquanto W estiver sendo pressionado
     {
-        seconds = (float)glfwGetTime();
-        ellapsed_seconds = seconds - oldseconds;
-        if(ellapsed_seconds > 0.1)
-        {
             if (acelera_frente <= 0.0015)                // E se a nave não chegou na velocidade máxima
-                acelera_frente+= 0.00005;                    //aumenta a velocidade dela.
+                acelera_frente+= 1.0*deltat;                    //aumenta a velocidade dela.
             anda_cima = 1;                          // Permite a nave andar para frente
             oldseconds = seconds;
-        }
     }
     if(freando)                                 // Enquanto W estiver sendo pressionado
     {
-        seconds = (float)glfwGetTime();
-        ellapsed_seconds = seconds - oldseconds;
-        if(ellapsed_seconds > 0.1)
-        {
+
             if (acelera_frente >= 0.0000)               // Se a nave não chegou na velocidade mínima
-                acelera_frente-= 0.00005;                    // diminui a velocidade
+                acelera_frente-= 1.0*deltat;                    // diminui a velocidade
             else                                        // Se a nave está na velocidade mínima (parada)
                 anda_cima = 0;                              // ela para de se mover
-            oldseconds = seconds;
-        }
+
     }
     if (anda_cima == 1)
     {
-        seconds = (float)glfwGetTime();
-        ellapsed_seconds = seconds - oldseconds;
-        if(ellapsed_seconds > 0.01)
-        {
-            oldseconds2 = seconds;
+
+
             camera_position_c -= acelera_frente * w;     // Faz o deslocamento da câmera (nave).
-        }
+
     }
     if(rotateR == 1){
         rotationX+=0.1f;

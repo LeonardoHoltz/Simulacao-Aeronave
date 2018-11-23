@@ -15,6 +15,7 @@ uniform mat4 projection;
 #define SPHERE 0
 #define SHIP 1
 #define PLANE  2
+#define COW 3
 uniform int object_id;
 
 // Atributos de vértice que serão gerados como saída ("out") pelo Vertex Shader.
@@ -125,6 +126,12 @@ void main()
         Ka = vec3(0.0,0.0,0.0);
         q = 20.0;
         // preenchido
+    }
+    else if(object_id== COW){
+        Kd = vec3(0.8,0.4,0.08);
+        Ks = vec3(0.0,0.0,0.0);
+        Ka = vec3(0.4,0.2,0.04);
+        q = 1.0;
     }
     else // Objeto desconhecido = preto
     {
