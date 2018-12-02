@@ -166,7 +166,7 @@ bool g_MiddleMouseButtonPressed = false; // Análogo para botão do meio do mous
 // usuário através do mouse (veja função CursorPosCallback()). A posição
 // efetiva da câmera é calculada dentro da função main(), dentro do loop de
 // renderização.
-float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
+float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Zvel_maxima = 1;
 float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 3.5f; // Distância da câmera para a origem
 
@@ -196,6 +196,8 @@ GLint model_uniform;
 GLint view_uniform;
 GLint projection_uniform;
 GLint object_id_uniform;
+GLint bbox_min_uniform;
+GLint bbox_max_uniform;
 
 float rotationX = 0.00f;
 int rotateR =0;
@@ -212,6 +214,8 @@ int anda_esquerda = 0;
 float acelera_frente = 0.00000f;
 int acelerando = 0;                     // indica se a nave está acelerando no momento
 int freando = 0;
+int vel_maxima = 0;
+
 // Tiro da nave
 float atira=0;
 std::vector <std::pair<glm::mat4,glm::vec4>> tiros;
@@ -233,38 +237,40 @@ float valor_param_vaca2 = 0.5f;
 
 //Ponto do tiro;
 std::vector<glm::vec4> shotpoints;
+
 //Interseção esfera;
 glm::vec4 esferacentro;
 float raioesfera;
 
-//variaveis de boxmin e boxman poderia colocar na estrutura mas sou burro
-glm::vec4 boxminvaca1;
-glm::vec4 boxmaxvaca1;
-
-glm::vec4 boxminvaca2;
-glm::vec4 boxmaxvaca2;
-
-glm::vec4 boxminnave1;
-glm::vec4 boxmaxnave1;
-
-//Funcões de contato
-bool isPointBox(glm::vec4 point,glm::vec4 boxmin,glm::vec4 boxmax)
+// Funcões de contato/intersecção
+// Intersecção cubo-plano
+bool isPlaneBox(glm::vec4 boxmin,glm::vec4 boxmax)
 {
-  return((point.x >= boxmin.x && point.x <= boxmax.x) &&
-         (point.y >= boxmin.y && point.y <= boxmax.y) &&
-         (point.z >= boxmin.z && point.z <= boxmax.z));
+  return (boxmin.y <= -1.0f);
 }
+// Intersecção ponto-esfera
 bool isPointCircle(glm::vec4 point,glm::vec4 circle,float raio)
 {
   float distance =norm((point-circle));
   return distance<raio;
 }
+// Intersecção cubo-cubo
 bool boxintersect(glm::vec4 boxmin1,glm::vec4 boxmax1,glm::vec4 boxmin2,glm::vec4 boxmax2)
 {
-    return((boxmin1.x<=boxmax2.x)&&(boxmax1.x>=boxmin2.x)&&
-           (boxmin1.y<=boxmax2.y)&&(boxmax1.y>=boxmin2.y)&&
-           (boxmin1.z<=boxmax2.z)&&(boxmax1.z>=boxmin2.z)
-           );
+    return (((((boxmin1.x>=boxmin2.x) && (boxmin1.x<=boxmax2.x)) ||
+              ((boxmax1.x>=boxmin2.x) && (boxmax1.x<=boxmax2.x))) ||
+             (((boxmin1.x<=boxmin2.x) && (boxmin1.x>=boxmax2.x)) ||
+              ((boxmax1.x<=boxmin2.x) && (boxmax1.x>=boxmax2.x)))) &&
+
+            ((((boxmin1.y>=boxmin2.y) && (boxmin1.y<=boxmax2.y)) ||
+              ((boxmax1.y>=boxmin2.y) && (boxmax1.y<=boxmax2.y))) ||
+             (((boxmin1.y<=boxmin2.y) && (boxmin1.y>=boxmax2.y)) ||
+              ((boxmax1.y<=boxmin2.y) && (boxmax1.y>=boxmax2.y)))) &&
+
+            ((((boxmin1.z>=boxmin2.z) && (boxmin1.z<=boxmax2.z)) ||
+              ((boxmax1.z>=boxmin2.z) && (boxmax1.z<=boxmax2.z))) ||
+             (((boxmin1.z<=boxmin2.z) && (boxmin1.z>=boxmax2.z)) ||
+              ((boxmax1.z<=boxmin2.z) && (boxmax1.z>=boxmax2.z)))));
 }
 
 //RANGE DO TIRO
@@ -272,6 +278,48 @@ std::vector<double> shotrange;
 
 // Vetor de posição das vacas nas curvas bezier
 glm::vec4 posicao_vaca;
+
+// Booleanos para saber se a nave acertou um tiro
+int vaca1_acertada = 0, vaca2_acertada = 0, esfera_acertada = 0;
+
+// Booleano para saber se a nave colidiu contra um objeto
+int nave_bateu = 0;
+
+// String de mensagens na tela da aplicação:
+int texto = 0;
+
+const std::string inicio = "Bem vindo a simulacao do aviao de batalha da forca aerea brasileira!";
+const std::string inicio2 = "Voce foi selecionado para ser um dos nossos novos pilotos, entretanto,";
+const std::string inicio3 = "como ainda nao possui experiencia com as nossas aeronaves, voce deve passar";
+const std::string inicio4 = "primeiro por nossa simulacao. Para comecar, aperte a tecla 'L'.";
+
+const std::string nave_parada = "Otimo. Esta eh a visao da nave em terceira pessoa. Voce podera controlar ela";
+const std::string nave_parada2 = "livremente. Para fazer ela andar, segure 'W' e a aeronave comecara a acelerar.";
+const std::string nave_parada3 = "Conforme mais voce segura a tecla, mais ela acelerara ate a velocidade limite.";
+const std::string nave_parada4 = "Use as teclas 'A' e 'D' para mover a nave para a esquerda e direita, respectivamente,";
+const std::string nave_parada5 = "e use a movimentação para cima e para baixo do mouse para descer e subir a nave";
+const std::string nave_parada6 = "respectivamente. Por agora, tente chegar a velocidade maxima da aeronave.";
+
+const std::string nave_em_movimento = "Excelente! Eh importante voce nao colidir a nave no chao ou em qualquer objeto que";
+const std::string nave_em_movimento1 = "esteja voando. Isso significara o fim da simulacao e voce nao estara apto em pilotar";
+const std::string nave_em_movimento2 = "uma aeronave de verdade. Voce pode parar a aeronave no ar quando quiser ao segurar a";
+const std::string nave_em_movimento3 = "tecla 'S', ela ira diminuir a velocidade da nave ate que pare, tente fazer isso.";
+
+const std::string tiro_esfera = "Excelente! Em seguida, vamos tentar atirar com a aeronave, use a tecla espaco para atirar.";
+const std::string tiro_esfera2 = "Para seguirmos para a próxima parte da simulação, tenta achar uma esfera, mire e atire nela.";
+
+const std::string tiro_vacas = "Bom tiro, vamos exercitar um pouco mais. Dessa vez tentar alvos mais dificeis para acertar.";
+const std::string tiro_vacas2 = "Encontre as 2 vacas que estao voando pelo ceu e tenta acerta-las, elas se movimentam bem rapido,";
+const std::string tiro_vacas3 = "entao tome cuidado e tente nao ser acertado por elas tambem.";
+
+const std::string fim = "Parabens, voce concluiu todos os testes da simulacao e esta pronto para pilotar";
+const std::string fim2 = "uma aeronave de verdade, pressione esc para sair da simulacao ou 'U' para tentar novamente.";
+
+const std::string colisao_detectada = "Voce colidiu a nave! Voce nunca ira ser um piloto se continuar assim.";
+const std::string colisao_detectada2 = "Pressione 'U' para reiniciar a simulacao ou pressione esc para sair.";
+
+// Booleano para indicar o fim do programa
+int end_of_program = 0;
 
 // Número de texturas carregadas pela função LoadTextureImage()
 GLuint g_NumLoadedTextures = 0;
@@ -351,9 +399,9 @@ int main(int argc, char* argv[])
     LoadShadersFromFiles();
 
     // Carregamos duas imagens para serem utilizadas como textura
-    LoadTextureImage("../../data/tc-earth_daymap_surface.jpg");      // TextureImage0
-    LoadTextureImage("../../data/cow_texture.jpg");                  // TextureImage1
-    LoadTextureImage("../../data/metal_texture.jpg");                  // TextureImage1
+    LoadTextureImage("../../data/porto-alegre.jpg");      // TextureImage0
+    LoadTextureImage("../../data/cow_texture.jpg");    // TextureImage1
+    LoadTextureImage("../../data/metal_texture.jpg");  // TextureImage1
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -397,15 +445,37 @@ int main(int argc, char* argv[])
 
     int itiro = 0;      // Booleano para o tiro da nave
     float rotation = 0.0; //Rotação da nave baseada no precionamento de direita e esquerda
-    glm::mat4 modelLook_at;
+    glm::mat4 model_free_camera;
+
+    // bbox dos objetos
+    glm::vec4 cow1_bbox_min_const = glm::vec4(g_VirtualScene["cow"].bbox_min.x,g_VirtualScene["cow"].bbox_min.y,g_VirtualScene["cow"].bbox_min.z,1.0f);
+    glm::vec4 cow1_bbox_min;
+    glm::vec4 cow1_bbox_max_const = glm::vec4(g_VirtualScene["cow"].bbox_max.x,g_VirtualScene["cow"].bbox_max.y,g_VirtualScene["cow"].bbox_max.z,1.0f);
+    glm::vec4 cow1_bbox_max;
+
+    glm::vec4 cow2_bbox_min_const = cow1_bbox_min_const;
+    glm::vec4 cow2_bbox_min;
+    glm::vec4 cow2_bbox_max_const = cow1_bbox_max_const;
+    glm::vec4 cow2_bbox_max;
+
+    glm::vec4 nave_bbox_max_const = glm::vec4(g_VirtualScene["Arwing_SNES_Vert.001"].bbox_max.x,g_VirtualScene["Arwing_SNES_Vert.001"].bbox_max.y,g_VirtualScene["Arwing_SNES_Vert.001"].bbox_max.z,1.0f);
+    glm::vec4 nave_bbox_min_const = glm::vec4(g_VirtualScene["Arwing_SNES_Vert.001"].bbox_min.x,g_VirtualScene["Arwing_SNES_Vert.001"].bbox_min.y,g_VirtualScene["Arwing_SNES_Vert.001"].bbox_min.z,1.0f);
+    glm::vec4 nave_bbox_max;
+    glm::vec4 nave_bbox_min;
+
+    glm::vec4 vaca1_centro;
+    glm::vec4 vaca2_centro;
+
+    float vaca1_raio;
+    float vaca2_raio;
 
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
 
-        double tnow=glfwGetTime();
-        deltat = tnow- tprev;
-        tprev=tnow;
+        double tnow = glfwGetTime();
+        deltat = tnow - tprev;
+        tprev = tnow;
         // Aqui executamos as operações de renderização
 
         // Definimos a cor do "fundo" do framebuffer como branco.  Tal cor é
@@ -414,7 +484,7 @@ int main(int argc, char* argv[])
         // Conversaremos sobre sistemas de cores nas aulas de Modelos de Iluminação.
         //
         //           R     G     B     A
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClearColor(0.7f, 0.7f, 0.7f, 1.0f);
 
         // Fazemos a chamada da função de movimentação da nave, onde é calculada sua velocidade.
         Anda();
@@ -433,35 +503,38 @@ int main(int argc, char* argv[])
         // e ScrollCallback().
         glm::vec4 camera_view_vector;
         glm::vec4 camera_up_vector;
-        if(Look_at){
-        float r = 5.0f;;
-        float y = r*sin(g_CameraPhi);
-        float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
-        float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
+        if(Look_at)
+        {
+            float r = g_CameraDistance;
+            float y = r*sin(g_CameraPhi);
+            float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
+            float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
 
-        // Abaixo definimos as varáveis que efetivamente definem a câmera virtual.
-        // Veja slides 172-182 do documento "Aula_08_Sistemas_de_Coordenadas.pdf".
-        camera_position_c  =  glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
-        glm::vec4 camera_lookat_l    = glm::vec4(0.0f,0.0f,0.0f,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
-        camera_view_vector = camera_lookat_l -  camera_position_c ; // Vetor "view", sentido para onde a câmera está virada
-        camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
-        // Deltat é
-        deltat=0.0f;
+            // Abaixo definimos as varáveis que efetivamente definem a câmera virtual.
+            // Veja slides 172-182 do documento "Aula_08_Sistemas_de_Coordenadas.pdf".
+            camera_position_c  =  glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
+            glm::vec4 camera_lookat_l    = glm::vec4(0.0f,0.0f,0.0f,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
+            camera_view_vector = camera_lookat_l -  camera_position_c ; // Vetor "view", sentido para onde a câmera está virada
+            camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
+
+            // Deltat é
+            deltat=0.0f;
         }
-        else{
-        float r = 2.5f;
-        float y = r;
-        float z = r;
-        float x = r;
-        // Abaixo definimos as varáveis que efetivamente definem a câmera virtual.
-        // Veja slides 165-175 do documento "Aula_08_Sistemas_de_Coordenadas.pdf".
-        glm::vec4 camera_lookat_l    = glm::vec4(x,y,z,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
+        else
+        {
+            float r = 2.5f;
+            float y = r;
+            float z = r;
+            float x = r;
+            // Abaixo definimos as varáveis que efetivamente definem a câmera virtual.
+            // Veja slides 165-175 do documento "Aula_08_Sistemas_de_Coordenadas.pdf".
+            glm::vec4 camera_lookat_l    = glm::vec4(x,y,z,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
 
-         camera_up_vector= glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
-         camera_view_vector = Matrix_Rotate(g_CameraTheta,vector_v(glm::vec4(1.0f,0.0f,0.0f,0.0f),glm::vec4(0.0f,1.0f,0.0f,0.0f)))*
-        Matrix_Rotate(g_CameraPhi,vector_u(glm::vec4(1.0f,0.0f,0.0f,0.0f),glm::vec4(0.0f,1.0f,0.0f,0.0f)))*
-        glm::vec4(1.0f,0.0f,0.0f,0.0f);
-        glm::vec4 camera_view_vector2 = camera_view_vector;
+             camera_up_vector= glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
+             camera_view_vector = Matrix_Rotate(g_CameraTheta,vector_v(glm::vec4(1.0f,0.0f,0.0f,0.0f),glm::vec4(0.0f,1.0f,0.0f,0.0f)))*
+            Matrix_Rotate(g_CameraPhi,vector_u(glm::vec4(1.0f,0.0f,0.0f,0.0f),glm::vec4(0.0f,1.0f,0.0f,0.0f)))*
+            glm::vec4(1.0f,0.0f,0.0f,0.0f);
+            glm::vec4 camera_view_vector2 = camera_view_vector;
         }
         glm::vec4 v = vector_v(camera_view_vector,camera_up_vector);
         w = vector_w(camera_view_vector,camera_up_vector);
@@ -477,7 +550,7 @@ int main(int argc, char* argv[])
         // Note que, no sistema de coordenadas da câmera, os planos near e far
         // estão no sentido negativo! Veja slides 190-193 do documento "Aula_09_Projecoes.pdf".
         float nearplane = -0.1f;  // Posição do "near plane"
-        float farplane  = -30.0f; // Posição do "far plane"
+        float farplane  = -50.0f; // Posição do "far plane"
 
         if (g_UsePerspectiveProjection)
         {
@@ -565,9 +638,16 @@ int main(int argc, char* argv[])
 
         if(Look_at)
         {
-            glm::vec3 up_ArWing=Matrix_Rotate_Y(0.0f)*Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*glm::vec4(0.0f,-0.3f,0.0f,0.0f);
-            model = Matrix_Scale(0.04f,0.04f,0.04f)*Matrix_Rotate_Y(0.0f)*
-                    Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*Matrix_Rotate_Z((rotation)*((3.14/2)*0.8)/ROTATELIMIT);
+            model = Matrix_Scale(0.04f,0.04f,0.04f);
+            /*model = Matrix_Scale(0.04f,0.04f,0.04f)*Matrix_Rotate_Y(0.0f)*
+                    Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*Matrix_Rotate_Z((rotation)*((3.14/2)*0.8)/ROTATELIMIT);*/
+
+            // Define as medidas de bbox da nave a partir das modificações no modelo
+            nave_bbox_max = Matrix_Scale(0.04f,0.04f,0.04f)*Matrix_Rotate_Y(0.0f)*
+                                            Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*Matrix_Rotate_Z((rotation)*((3.14/2)*0.8)/ROTATELIMIT) * nave_bbox_max_const;
+
+            nave_bbox_min = Matrix_Scale(0.04f,0.04f,0.04f)*Matrix_Rotate_Y(0.0f)*
+                                            Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*Matrix_Rotate_Z((rotation)*((3.14/2)*0.8)/ROTATELIMIT) * nave_bbox_min_const;
         }
         else
         {
@@ -577,102 +657,178 @@ int main(int argc, char* argv[])
                     camera_position_c.z+camera_view_vector.z+up_ArWing.z)*
                     Matrix_Scale(0.04f,0.04f,0.04f)*Matrix_Rotate_Y(g_CameraTheta)*
                     Matrix_Rotate_Z(g_CameraPhi)*Matrix_Rotate_Y(3.14+3.14/2)*Matrix_Rotate_Z((rotation)*((3.14/2)*0.8)/ROTATELIMIT);
-            modelLook_at =model;
+            model_free_camera = model;
+
+            // Define as medidas de bbox da nave a partir das modificações no modelo
+            nave_bbox_max = model * nave_bbox_max_const;
+
+            nave_bbox_min = model * nave_bbox_min_const;
         }
 
-
-        boxmaxnave1 = model* glm::vec4(g_VirtualScene["Arwing_SNES_Vert.001"].bbox_max.x,g_VirtualScene["Arwing_SNES_Vert.001"].bbox_max.y,g_VirtualScene["Arwing_SNES_Vert.001"].bbox_max.z,1.0f);
-        boxminnave1 = model* glm::vec4(g_VirtualScene["Arwing_SNES_Vert.001"].bbox_min.x,g_VirtualScene["Arwing_SNES_Vert.001"].bbox_min.y,g_VirtualScene["Arwing_SNES_Vert.001"].bbox_min.z,1.0f);
-
-        //testa se tocou uma vaquinha
-        if(boxintersect(boxminnave1,boxmaxnave1,boxminvaca1,boxmaxvaca1)||boxintersect(boxminnave1,boxmaxnave1,boxminvaca2,boxmaxvaca2))
+        if(!nave_bateu)
         {
-            std::cout<<"Tocou uma vaquinha" <<std::endl;
+            glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(object_id_uniform, SHIP);
+            DrawVirtualObject("Arwing_SNES_Vert.001");
+        }
+        else
+        {
+            texto = 6;
         }
 
-        glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1i(object_id_uniform, SHIP);
-        DrawVirtualObject("Arwing_SNES_Vert.001");
+        // Desenhamos o modelo do plano do chão
+        model = Matrix_Translate(0.0f,-1.0f,0.0f)
+              * Matrix_Scale(30.0f,1.0f,30.0f);
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, PLANE);
+        DrawVirtualObject("plane");
+
+        if(texto == 4 && !vaca1_acertada)
+        {
+            // Vaca 1
+            posicao_vaca = curva_bezier(1);
+            model = Matrix_Translate(posicao_vaca.x,posicao_vaca.y,posicao_vaca.z)*Matrix_Scale(1.0f,1.0f,1.0f)*Matrix_Rotate_Y(PI/2);
+            glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(object_id_uniform, COW);
+            DrawVirtualObject("cow");
+            glm::vec4 posicao_vaca;
+
+            //termina modelo de boxman e boxmin da primeira vaca
+            cow1_bbox_min = model * cow1_bbox_min_const;
+            cow1_bbox_max = model * cow1_bbox_max_const;
+            // Centro da vaca 1
+            vaca1_centro = (cow1_bbox_max + cow1_bbox_min) * 0.5f;
+            // Raio da vaca 1
+            vaca1_raio = norm(vaca1_centro - cow1_bbox_min);
+        }
+
+        if(texto == 4 && !vaca2_acertada)
+        {
+            // Vaca 2
+            posicao_vaca = curva_bezier(2);
+            model = Matrix_Translate(posicao_vaca.x,posicao_vaca.y,posicao_vaca.z)*Matrix_Scale(1.0f,1.0f,1.0f)*Matrix_Rotate_Y(-PI/2);
+            glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(object_id_uniform, COWTWO);
+            DrawVirtualObject("cow");
+
+            //termina modelo de boxman e boxmin da segunda vaca
+            cow2_bbox_min = model * cow2_bbox_min_const;
+            cow2_bbox_max = model * cow2_bbox_max_const;
+            // Centro vaca 2
+            vaca2_centro = (cow2_bbox_max + cow2_bbox_min) * 0.5f;
+            // Raio da vaca 2
+            vaca2_raio = norm(vaca2_centro - cow2_bbox_min);
+        }
+
 
         // Detecta se ouve tiro ou não
-        if(atira&&!Look_at)
+        if(atira && !Look_at)
         {
             primeiro=1;
             atira=0;
             itiro+=1;
-            tiros.push_back(std::make_pair(model*Matrix_Scale(0.3,0.3,0.3),glm::vec4(camera_view_vector.x,camera_view_vector.y,camera_view_vector.z,0.0)));
+            tiros.push_back(std::make_pair(model_free_camera * Matrix_Scale(0.3,0.3,0.3),glm::vec4(camera_view_vector.x,camera_view_vector.y,camera_view_vector.z,0.0)));
             shotpoints.push_back(glm::vec4(10000.0f,10000.0f,10000.0f,10000.0f));
             shotrange.push_back(0);
         }
         for(int i=0;i<tiros.size();i++)
         {
             // 25 = velocidade de tiro
-            tiros[i].first=Matrix_Translate(tiros[i].second.x*25*deltat,tiros[i].second.y*25*deltat,tiros[i].second.z*25*deltat)*tiros[i].first;
+            tiros[i].first = Matrix_Translate(tiros[i].second.x*25*deltat,tiros[i].second.y*25*deltat,tiros[i].second.z*25*deltat)*tiros[i].first;
             shotrange[i]+= 5*deltat;
-            if(shotrange[i]>2*5)
+            if(shotrange[i] > 10)
             {
-                std::cout<<tiros.size()<<std::endl;
                 tiros.erase(std::remove(tiros.begin(), tiros.end(), tiros[i]), tiros.end());
                 shotrange.erase(std::remove(shotrange.begin(), shotrange.end(), shotrange[i]), shotrange.end());
             }
             model = tiros[i].first;
-            glm::vec3 auxs1 = (g_VirtualScene["sphere"].bbox_max+g_VirtualScene["sphere"].bbox_min)/2.0f;;//vetor calculo centro tiro;
             shotpoints[i] = model*glm::vec4(0.0f,0.0f,0.0f,1.0f);
             glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(object_id_uniform, SPHERE);
             DrawVirtualObject("sphere");
 
             //TESTES DE INTESEÇÃO BALAS
-            if(isPointBox(shotpoints[i],boxminvaca1,boxmaxvaca1))
+            if(isPointCircle(shotpoints[i],vaca1_centro,vaca1_raio) && (texto == 4) && !vaca1_acertada)
             {
-                 std::cout<<"ACERTOU VACA 1"<<std::endl;
+                 vaca1_acertada = 1;
             }
-            if(isPointBox(shotpoints[i],boxminvaca2,boxmaxvaca2))
+            if(isPointCircle(shotpoints[i],vaca2_centro,vaca2_raio) && (texto == 4) && !vaca2_acertada)
             {
-                 std::cout<<"ACERTOU VACA 2"<<std::endl;
+                 vaca2_acertada = 1;
             }
-            if(isPointCircle(shotpoints[i] ,esferacentro,raioesfera))
+            if(isPointCircle(shotpoints[i],esferacentro,raioesfera) && (texto == 3))
             {
-                std::cout<<"ACERTOU ESFERA"<<std::endl;
+                texto = 4;
             }
-
         }
 
-        // Desenhamos o modelo do plano do chão
-        model = Matrix_Translate(0.0f,-1.0f,0.0f)
-              * Matrix_Scale(10.0f,1.0f,10.0f);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, PLANE);
-        DrawVirtualObject("plane");
+        //testa se tocou uma vaquinha
+        if(((boxintersect(nave_bbox_min,nave_bbox_max,cow1_bbox_min,cow1_bbox_max) && !vaca1_acertada) ||
+            boxintersect(nave_bbox_min,nave_bbox_max,cow2_bbox_min,cow2_bbox_max) && !vaca2_acertada) && !nave_bateu)
+        {
+            nave_bateu = 1;
+        }
 
-        //modelo de boxmin e boxmax da vaca é feito para outras vacas
+        //testa se tocou o plano
+        if(isPlaneBox(nave_bbox_min,nave_bbox_max) && !nave_bateu)
+        {
+            nave_bateu = 1;
+        }
 
-        // Vaca 1
-        posicao_vaca = curva_bezier(1);
-        model = Matrix_Translate(posicao_vaca.x,posicao_vaca.y,posicao_vaca.z)*Matrix_Scale(1.0f,1.0f,1.0f)*Matrix_Rotate_Y(PI/2);
-        boxmaxvaca1 = model * glm::vec4(g_VirtualScene["cow"].bbox_max.x,g_VirtualScene["cow"].bbox_max.y,g_VirtualScene["cow"].bbox_max.z,1.0f);
-        boxminvaca1 = model * glm::vec4(g_VirtualScene["cow"].bbox_min.x,g_VirtualScene["cow"].bbox_min.y,g_VirtualScene["cow"].bbox_min.z,1.0f);
-        //termina modelo de boxman e boxmin
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, COW);
-        DrawVirtualObject("cow");
-        glm::vec4 posicao_vaca;
+        // Se o usuário acertar a esfera, ela não é mais desenhada
+        if(texto == 3)
+        {
+            model = Matrix_Translate(0.5f,1.0f,1.0f)*Matrix_Scale(0.3f,0.3f,0.3f);
+            esferacentro = model*glm::vec4(0.0f,0.0f,0.0f,1.0f);
+            glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(object_id_uniform, SPHERE);
+            DrawVirtualObject("sphere");
+            raioesfera=0.3f;
+        }
 
-        // Vaca 2
-        posicao_vaca = curva_bezier(2);
-        model = Matrix_Translate(posicao_vaca.x,posicao_vaca.y,posicao_vaca.z)*Matrix_Scale(1.0f,1.0f,1.0f)*Matrix_Rotate_Y(-PI/2);
-        boxmaxvaca2 = model * glm::vec4(g_VirtualScene["cow"].bbox_max.x,g_VirtualScene["cow"].bbox_max.y,g_VirtualScene["cow"].bbox_max.z,1.0f);
-        boxminvaca2 = model * glm::vec4(g_VirtualScene["cow"].bbox_min.x,g_VirtualScene["cow"].bbox_min.y,g_VirtualScene["cow"].bbox_min.z,1.0f);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, COWTWO);
-        DrawVirtualObject("cow");
+        // Mensagens da tela
+        switch(texto)
+        {
+        case 0:
+            TextRendering_PrintString(window, inicio, -1.0, 0.95, 1.0);
+            TextRendering_PrintString(window, inicio2, -1.0, 0.90, 1.0);
+            TextRendering_PrintString(window, inicio3, -1.0, 0.85, 1.0);
+            TextRendering_PrintString(window, inicio4, -1.0, 0.80, 1.0);
+            break;
+        case 1:
+            TextRendering_PrintString(window, nave_parada, -1.0, 0.95, 1.0);
+            TextRendering_PrintString(window, nave_parada2, -1.0, 0.90, 1.0);
+            TextRendering_PrintString(window, nave_parada3, -1.0, 0.85, 1.0);
+            TextRendering_PrintString(window, nave_parada4, -1.0, 0.80, 1.0);
+            TextRendering_PrintString(window, nave_parada5, -1.0, 0.75, 1.0);
+            TextRendering_PrintString(window, nave_parada6, -1.0, 0.70, 1.0);
+            break;
+        case 2:
+            TextRendering_PrintString(window, nave_em_movimento, -1.0, 0.95, 1.0);
+            TextRendering_PrintString(window, nave_em_movimento1, -1.0, 0.90, 1.0);
+            TextRendering_PrintString(window, nave_em_movimento2, -1.0, 0.85, 1.0);
+            TextRendering_PrintString(window, nave_em_movimento3, -1.0, 0.80, 1.0);
+            break;
+        case 3:
+            TextRendering_PrintString(window, tiro_esfera, -1.0, 0.95, 1.0);
+            TextRendering_PrintString(window, tiro_esfera2, -1.0, 0.90, 1.0);
+            break;
+        case 4:
+            TextRendering_PrintString(window, tiro_vacas, -1.0, 0.95, 1.0);
+            TextRendering_PrintString(window, tiro_vacas2, -1.0, 0.90, 1.0);
+            TextRendering_PrintString(window, tiro_vacas3, -1.0, 0.85, 1.0);
+            break;
+        case 5:
+            TextRendering_PrintString(window, fim, -1.0, 0.95, 1.0);
+            TextRendering_PrintString(window, fim2, -1.0, 0.90, 1.0);
+            break;
+        case 6:
+            TextRendering_PrintString(window, colisao_detectada, -1.0, 0.95, 1.0);
+            TextRendering_PrintString(window, colisao_detectada2, -1.0, 0.90, 1.0);
+        }
 
-        model = Matrix_Translate(0.5f,1.0f,1.0f)*Matrix_Scale(0.3f,0.3f,0.3f);
-        esferacentro = model*glm::vec4(0.0f,0.0f,0.0f,1.0f);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, SPHERE);
-        DrawVirtualObject("sphere");
-        raioesfera=0.3f;
+        if(vaca1_acertada && vaca2_acertada)
+            texto = 5;
 
         // Pegamos um vértice com coordenadas de modelo (0.5, 0.5, 0.5, 1) e o
         // passamos por todos os sistemas de coordenadas armazenados nas
@@ -698,6 +854,12 @@ int main(int argc, char* argv[])
         // definidas anteriormente usando glfwSet*Callback() serão chamadas
         // pela biblioteca GLFW.
         glfwPollEvents();
+
+        if(end_of_program)
+        {
+            glfwTerminate();
+            return 0;
+        }
     }
 
     // Finalizamos o uso dos recursos do sistema operacional
@@ -825,8 +987,8 @@ void LoadShadersFromFiles()
     view_uniform            = glGetUniformLocation(program_id, "view"); // Variável da matriz "view" em shader_vertex.glsl
     projection_uniform      = glGetUniformLocation(program_id, "projection"); // Variável da matriz "projection" em shader_vertex.glsl
     object_id_uniform       = glGetUniformLocation(program_id, "object_id"); // Variável "object_id" em shader_fragment.glsl
-    GLint bbox_min_uniform  = glGetUniformLocation(program_id, "bbox_min");
-    GLint bbox_max_uniform  = glGetUniformLocation(program_id, "bbox_max");
+    bbox_min_uniform  = glGetUniformLocation(program_id, "bbox_min");
+    bbox_max_uniform  = glGetUniformLocation(program_id, "bbox_max");
 
     // Variáveis em "shader_fragment.glsl" para acesso das imagens de textura
     glUseProgram(program_id);
@@ -1339,12 +1501,18 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 
     // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
     float dy = ypos - g_LastCursorPosY;
+    float dx = xpos - g_LastCursorPosX;
 
     // Atualizamos parâmetros da câmera com os deslocamentos
     // Mudou de (-) para (+) para inverter os controles da camera que também controlam a nave,
     // para dar a sensação de um controle de manche de um avião/nave
-    g_CameraPhi   += 2.5f*dy*deltat;
-
+    if(!Look_at)
+        g_CameraPhi   += 1.5f*dy*deltat;
+    else
+    {
+        g_CameraTheta -= 0.01f*dx;
+        g_CameraPhi   += 0.01f*dy;
+    }
 
     // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
     float phimax = 3.141592f/2;
@@ -1451,13 +1619,6 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     // Se o usuário apertar a tecla espaço, a nave do jogo atira
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS &&primeiro!= 1)
     {
-        //g_AngleX = 0.0f;
-        //g_AngleY = 0.0f;
-        //g_AngleZ = 0.0f;
-        //g_ForearmAngleX = 0.0f;
-        //g_ForearmAngleZ = 0.0f;
-        //g_TorsoPositionX = 0.0f;
-        //g_TorsoPositionY = 0.0f;
         atira = 1;
         primeiro=1;
     }
@@ -1494,10 +1655,31 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     if (key == GLFW_KEY_L && action == GLFW_PRESS&&Look_at)
     {
         Look_at = false;
+        if(texto == 0)
+            texto = 1;
         g_CameraTheta=0;
         g_CameraPhi=0;
         camera_position_c=glm::vec4(0.0f,0.0f,0.0f,1.0f);
-
+    }
+    // Se o usuário apertar a tecla ESC, o programa encerrará
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+    {
+        glfwDestroyWindow(window);
+        end_of_program = 1;
+    }
+        // Se o usuário apertar a tecla U, a simulacao será reiniciada.
+    if (key == GLFW_KEY_U && action == GLFW_PRESS)
+    {
+        Look_at = true;
+        nave_bateu = 0;
+        vaca1_acertada = 0;
+        vaca2_acertada = 0;
+        esfera_acertada = 0;
+        texto = 0;
+        g_CameraTheta=0;
+        g_CameraPhi=0;
+        camera_position_c=glm::vec4(0.0f,0.0f,0.0f,1.0f);
+        acelera_frente = 0.0f;
     }
 }
 
@@ -1772,34 +1954,32 @@ void PrintObjModelInfo(ObjModel* model)
 
 void Anda()
 {
-    static float oldseconds = (float)glfwGetTime();
-    static float oldseconds2 = (float)glfwGetTime();
-    float seconds;
-    float ellapsed_seconds;
     float dx = anda_direita - anda_esquerda;
     g_CameraTheta -= 1.5f*dx*deltat;
-    if(acelerando)                              // Enquanto W estiver sendo pressionado
+    if(acelerando)                                  // Enquanto W estiver sendo pressionado
     {
-            if (acelera_frente <= 0.0015)                // E se a nave não chegou na velocidade máxima
-                acelera_frente+= 1.0*deltat;                    //aumenta a velocidade dela.
-            anda_cima = 1;                          // Permite a nave andar para frente
-            oldseconds = seconds;
+        if(acelera_frente <= 0.05 && !Look_at)     // E se a nave não chegou na velocidade máxima
+            acelera_frente += 0.01*deltat;        //aumenta a velocidade dela.
+        else
+            if(texto == 1)
+                texto = 2;
+        anda_cima = 1;                              // Permite a nave andar para frente
     }
-    if(freando)                                 // Enquanto W estiver sendo pressionado
+    if(freando)                                     // Enquanto W estiver sendo pressionado
     {
-
-            if (acelera_frente >= 0.0000)               // Se a nave não chegou na velocidade mínima
-                acelera_frente-= 1.0*deltat;                    // diminui a velocidade
-            else                                        // Se a nave está na velocidade mínima (parada)
-                anda_cima = 0;                              // ela para de se mover
-
+        if (acelera_frente >= 0.0000)               // Se a nave não chegou na velocidade mínima
+            acelera_frente -= 0.02*deltat;        // diminui a velocidade
+        else                                        // Se a nave está na velocidade mínima (parada)
+        {
+            anda_cima = 0;                          // ela para de se mover
+            if(texto == 2)
+                texto = 3;
+        }
     }
     if (anda_cima == 1)
     {
-
-
-            camera_position_c -= acelera_frente * w;     // Faz o deslocamento da câmera (nave).
-
+        if(!nave_bateu)
+            camera_position_c -= acelera_frente * w;    // Faz o deslocamento da câmera (nave).
     }
     if(rotateR == 1){
         rotationX+=0.1f*deltat;
@@ -1820,19 +2000,19 @@ glm::vec4 curva_bezier(int which_cow)
 
     // Apotema do triangulo que definirá nossa curva Bezier Circular
     float apothem_x = 0.0f;
-    float apothem_y = 6.0f;
+    float apothem_y = 12.0f;
     float apothem_z;
 
     // Altura do triangulo
-    float height = 15.0f;
+    float height = 30.0f;
 
     // Vaca 1
     if(which_cow == 1)
-        apothem_z = 5.0f;
+        apothem_z = 15.0f;
 
     // Vaca 2
     else
-        apothem_z = -5.0f;
+        apothem_z = -15.0f;
 
     float lado = height/(sqrt(3)/2);
 

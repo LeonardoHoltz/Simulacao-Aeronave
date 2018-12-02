@@ -29,18 +29,11 @@ out vec4 normal;
 out vec2 texcoords;
 out vec3 colorGourad;
 
-// Parâmetros da axis-aligned bounding box (AABB) do modelo
-uniform vec4 bbox_min;
-uniform vec4 bbox_max;
-
 // Variáveis para acesso das imagens de textura
 uniform sampler2D TextureImage0;
 uniform sampler2D TextureImage1;
 uniform sampler2D TextureImage2;
 
-// Constantes
-#define M_PI   3.14159265358979323846
-#define M_PI_2 1.57079632679489661923
 
 void main()
 {
@@ -108,25 +101,6 @@ void main()
     // Vetor que define o sentido da câmera em relação ao ponto atual.
     vec4 v = normalize(camera_position - p);
 
-    // Coordenadas de textura U e V
-    float U = 0.0;
-    float V = 0.0;
-
-    // Angulos para projeção esférica de textura
-    float ro;
-    float theta;
-    float phi;
-
-    // Coordenadas máximas e mínimas do objeto
-    float minx;
-    float maxx;
-
-    float miny;
-    float maxy;
-
-    float minz;
-    float maxz;
-
     // Vetor que define o sentido da reflexão especular ideal.
     vec4 r = normalize(-l + 2*n*(dot(n,l)));
 
@@ -139,9 +113,9 @@ void main()
     if ( object_id == SPHERE )
     {
         // Propriedades espectrais da esfera
-        Kd = vec3(0.8,0.4,0.08);
-        Ks = vec3(0.0,0.0,0.0);
-        Ka = vec3(0.4,0.2,0.04);
+        Kd = vec3(1.0,0.33,0.11);
+        Ks = vec3(1.0,0.1,0.1);
+        Ka = vec3(1.0,0.33,0.11);
         q = 1.0;
     }
     else if ( object_id == SHIP )
@@ -160,23 +134,12 @@ void main()
         Ka = vec3(0.0,0.0,0.0);
         q = 20.0;
     }
-    else if(object_id== COW)
+    else if(object_id == COW)
     {
-        Kd = vec3(1.0,1.0,1.0);
+        Kd = vec3(0.5,0.0,0.9);
         Ks = vec3(0.5,0.5,0.5);
-        Ka = vec3(1.0,1.0,1.0);
+        Ka = vec3(0.5,0.0,0.9);
         q = 1.0;
-
-        vec4 bbox_center = (bbox_min + bbox_max) / 2.0;
-
-        vec4 p2 = position_model - bbox_center;
-        ro = length(p2);
-        theta = atan(p2.x, p2.z);
-        phi = asin(p2.y/ro);
-
-        U = (theta + M_PI)/(2 * M_PI);
-        V = (phi + M_PI_2)/M_PI;
-        // preenchido
     }
     else // Objeto desconhecido = preto
     {
@@ -201,23 +164,9 @@ void main()
     // Termo especular utilizando o modelo de iluminação de Phong
     vec3 phong_specular_term  = Ks*I*pow(max(0, dot(r,v)),q);
 
-    // Obtemos a refletância difusa a partir da leitura da imagem TextureImage0
-    vec3 Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
-
-    // Obtemos a refletância difusa a partir da leitura da imagem TextureImage1
-    vec3 Kd1 = texture(TextureImage1, vec2(U,V)).rgb;
-
-    // Obtemos a refletância difusa a partir da leitura da imagem TextureImage2
-    vec3 Kd2 = texture(TextureImage2, vec2(U,V)).rgb;
-
     // Cor final do fragmento calculada com uma combinação dos termos difuso,
     // especular, e ambiente. Veja slide 133 do documento "Aula_17_e_18_Modelos_de_Iluminacao.pdf".
-    colorGourad = lambert_diffuse_term + ambient_term + phong_specular_term;
-
-    if(object_id == COW)
-    {
-        colorGourad = Kd1 * colorGourad;
-    }
+    colorGourad = lambert_diffuse_term + ambient_term;
 
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas

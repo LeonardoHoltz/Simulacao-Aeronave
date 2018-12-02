@@ -88,20 +88,10 @@ void main()
     if ( object_id == SPHERE )
     {
         // Propriedades espectrais da esfera
-        Kd = vec3(1.0,1.0,1.0);
-        Ks = vec3(0.0,0.0,0.0);
-        Ka = vec3(1.0,1.0,1.0);
-        q = 20.0;
-
-        vec4 bbox_center = (bbox_min + bbox_max) / 2.0;
-
-        vec4 p2 = position_model - bbox_center;
-        ro = length(p2);
-        theta = atan(p2.x, p2.z);
-        phi = asin(p2.y/ro);
-
-        U = (theta + M_PI)/(2 * M_PI);
-        V = (phi + M_PI_2)/M_PI;
+        Kd = vec3(1.0,0.0,0.0);
+        Ks = vec3(1.0,0.0,0.0);
+        Ka = vec3(1.0,0.0,0.0);
+        q = 10.0;
     }
     else if ( object_id == SHIP )
     {
@@ -110,7 +100,6 @@ void main()
         Ks = vec3(0.8,0.8,0.8);
         Ka = vec3(0.5,0.5,0.5);
         q = 32.0;
-
         vec4 bbox_center = (bbox_min + bbox_max) / 2.0;
 
         vec4 p2 = position_model - bbox_center;
@@ -133,20 +122,10 @@ void main()
     }
     else if(object_id == COWTWO)
     {
-        Kd = vec3(1.0,1.0,1.0);
+        Kd = vec3(0.2,0.9,0.02);
         Ks = vec3(1.0,1.0,1.0);
-        Ka = vec3(1.0,1.0,1.0);
-        q = 1.0;
-
-        vec4 bbox_center = (bbox_min + bbox_max) / 2.0;
-
-        vec4 p2 = position_model - bbox_center;
-        ro = length(p2);
-        theta = atan(p2.x, p2.z);
-        phi = asin(p2.y/ro);
-
-        U = (theta + M_PI)/(2 * M_PI);
-        V = (phi + M_PI_2)/M_PI;
+        Ka = vec3(0.2,0.9,0.02);
+        q = 10.0;
     }
     else // Objeto desconhecido = preto
     {
@@ -176,10 +155,6 @@ void main()
     vec3 phong_specular_term  = Ks*I*pow(max(0, dot(r,v)),q); // PREENCHA AQUI o termo especular de Phong
     // preenchido
 
-    // Cor final do fragmento calculada com uma combinação dos termos difuso,
-    // especular, e ambiente. Veja slide 133 do documento "Aula_17_e_18_Modelos_de_Iluminacao.pdf".
-    //color = lambert_diffuse_term + ambient_term + phong_specular_term;
-
     // Obtemos a refletância difusa a partir da leitura da imagem TextureImage0
     vec3 Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
 
@@ -193,26 +168,32 @@ void main()
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
     if(object_id == COWTWO)
     {
+        // Cor de fragmento final, juntando as 3 equaçoes
         color = lambert_diffuse_term + ambient_term + phong_specular_term;
-        color = Kd1 * color;
+        // Cor final com correção gamma, considerando monitor sRGB
         color = pow(color, vec3(1.0,1.0,1.0)/2.2);
     }
     if(object_id == SHIP)
     {
+        // Cor de fragmento final, juntando as 3 equaçoes
         color = lambert_diffuse_term + ambient_term + phong_specular_term;
         color = Kd2 * color;
+        // Cor final com correção gamma, considerando monitor sRGB
         color = pow(color, vec3(1.0,1.0,1.0)/2.2);
     }
     if(object_id == SPHERE)
     {
+        // Cor de fragmento final, juntando as 3 equaçoes
         color = lambert_diffuse_term + ambient_term + phong_specular_term;
-        color = Kd0 * color;
+        // Cor final com correção gamma, considerando monitor sRGB
         color = pow(color, vec3(1.0,1.0,1.0)/2.2);
     }
     if (object_id == PLANE)
     {
+        // Cor de fragmento final, juntando as 3 equaçoes
         color = lambert_diffuse_term + ambient_term + phong_specular_term;
         color = Kd0 * colorGourad;
+        // Cor final com correção gamma, considerando monitor sRGB
         color = pow(color,vec3(1.0,1.0,1.0)/2.2);
     }
     if(object_id == COW)
