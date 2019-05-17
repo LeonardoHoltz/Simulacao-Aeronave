@@ -222,6 +222,7 @@ std::vector <std::pair<glm::mat4,glm::vec4>> tiros;
 double tprev=glfwGetTime();
 double tnow;
 double deltat;
+int last_i = -1;
 
 // Constantes de movimentação da nave.
 #define ROTATELIMIT 25                // limite de rotação da nave quando ela anda para a direita ou esquerda
@@ -306,7 +307,8 @@ const std::string nave_em_movimento2 = "uma aeronave de verdade. Voce pode parar
 const std::string nave_em_movimento3 = "tecla 'S', ela ira diminuir a velocidade da nave ate que pare, tente fazer isso.";
 
 const std::string tiro_esfera = "Excelente! Em seguida, vamos tentar atirar com a aeronave, use a tecla espaco para atirar.";
-const std::string tiro_esfera2 = "Para seguirmos para a próxima parte da simulação, tenta achar uma esfera, mire e atire nela.";
+const std::string tiro_esfera2 = "Para seguirmos para a próxima parte da simulação, tenta achar uma esfera, mire e atire nela ate estourar.";
+const std::string tiro_esfera3 = "Nao se preocupe, voce pode colidir com ela por enquanto.";
 
 const std::string tiro_vacas = "Bom tiro, vamos exercitar um pouco mais. Dessa vez tentar alvos mais dificeis para acertar.";
 const std::string tiro_vacas2 = "Encontre as 2 vacas que estao voando pelo ceu e tenta acerta-las, elas se movimentam bem rapido,";
@@ -323,6 +325,9 @@ int end_of_program = 0;
 
 // Número de texturas carregadas pela função LoadTextureImage()
 GLuint g_NumLoadedTextures = 0;
+
+// Tamanho da esfera
+float sphere_size = 0.3;
 
 int main(int argc, char* argv[])
 {
@@ -400,7 +405,6 @@ int main(int argc, char* argv[])
 
     // Carregamos duas imagens para serem utilizadas como textura
     LoadTextureImage("../../data/porto-alegre.jpg");      // TextureImage0
-    LoadTextureImage("../../data/cow_texture.jpg");    // TextureImage1
     LoadTextureImage("../../data/metal_texture.jpg");  // TextureImage1
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
@@ -740,6 +744,7 @@ int main(int argc, char* argv[])
             {
                 tiros.erase(std::remove(tiros.begin(), tiros.end(), tiros[i]), tiros.end());
                 shotrange.erase(std::remove(shotrange.begin(), shotrange.end(), shotrange[i]), shotrange.end());
+                last_i = -1;
             }
             model = tiros[i].first;
             shotpoints[i] = model*glm::vec4(0.0f,0.0f,0.0f,1.0f);
@@ -758,7 +763,13 @@ int main(int argc, char* argv[])
             }
             if(isPointCircle(shotpoints[i],esferacentro,raioesfera) && (texto == 3))
             {
-                texto = 4;
+                if(last_i != i)
+                {
+                    sphere_size = sphere_size + 0.1;
+                    if(sphere_size >= 1.5)
+                        texto = 4;
+                    last_i = i;
+                }
             }
         }
 
@@ -775,15 +786,15 @@ int main(int argc, char* argv[])
             nave_bateu = 1;
         }
 
-        // Se o usuário acertar a esfera, ela não é mais desenhada
+        // Se o usuário acertar a esfera, ela cresce até ser estourada
         if(texto == 3)
         {
-            model = Matrix_Translate(0.5f,1.0f,1.0f)*Matrix_Scale(0.3f,0.3f,0.3f);
+            model = Matrix_Translate(0.5f,1.0f,1.0f)*Matrix_Scale(sphere_size,sphere_size,sphere_size);
             esferacentro = model*glm::vec4(0.0f,0.0f,0.0f,1.0f);
             glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
             glUniform1i(object_id_uniform, SPHERE);
             DrawVirtualObject("sphere");
-            raioesfera=0.3f;
+            raioesfera = sphere_size;
         }
 
         // Mensagens da tela
@@ -812,6 +823,7 @@ int main(int argc, char* argv[])
         case 3:
             TextRendering_PrintString(window, tiro_esfera, -1.0, 0.95, 1.0);
             TextRendering_PrintString(window, tiro_esfera2, -1.0, 0.90, 1.0);
+            TextRendering_PrintString(window, tiro_esfera3, -1.0, 0.85, 1.0);
             break;
         case 4:
             TextRendering_PrintString(window, tiro_vacas, -1.0, 0.95, 1.0);
@@ -1680,6 +1692,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_CameraPhi=0;
         camera_position_c=glm::vec4(0.0f,0.0f,0.0f,1.0f);
         acelera_frente = 0.0f;
+        sphere_size = 0.3;
     }
 }
 
@@ -1781,6 +1794,8 @@ void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
 
     float lineheight = TextRendering_LineHeight(window);
     float charwidth = TextRendering_CharWidth(window);
+
+    TextRendering_PrintString(window, buffer, 1.0f-(numchars + 1)*charwidth, 1.0f-lineheight, 1.0f);
 }
 
 // Função para debugging: imprime no terminal todas informações de um modelo

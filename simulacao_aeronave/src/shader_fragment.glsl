@@ -161,9 +161,6 @@ void main()
     // Obtemos a refletância difusa a partir da leitura da imagem TextureImage1
     vec3 Kd1 = texture(TextureImage1, vec2(U,V)).rgb;
 
-    // Obtemos a refletância difusa a partir da leitura da imagem TextureImage2
-    vec3 Kd2 = texture(TextureImage2, vec2(U,V)).rgb;
-
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
     if(object_id == COWTWO)
@@ -177,7 +174,7 @@ void main()
     {
         // Cor de fragmento final, juntando as 3 equaçoes
         color = lambert_diffuse_term + ambient_term + phong_specular_term;
-        color = Kd2 * color;
+        color = Kd1 * color;
         // Cor final com correção gamma, considerando monitor sRGB
         color = pow(color, vec3(1.0,1.0,1.0)/2.2);
     }
